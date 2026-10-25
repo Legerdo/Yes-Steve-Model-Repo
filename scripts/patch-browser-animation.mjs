@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { patchBrowserMolangRenderer, prepareBrowserMolangFiles } from './patch-browser-molang.mjs';
+import { patchBrowserAtlasSource } from './patch-browser-atlas.mjs';
 
 const ORIGINAL_BINDING = `        const bonePath = getObjectPath(scene, boneObj);
         if (!bonePath) continue;`;
@@ -55,6 +56,7 @@ export function patchBrowserAnimationSource(source) {
     result = replaceOnce(result, ORIGINAL_BINDING, UUID_BINDING, 'animation binding');
     result = replaceOnce(result, ORIGINAL_PATH_HELPER, '', 'animation path helper');
     result = patchBrowserMolangRenderer(result);
+    result = patchBrowserAtlasSource(result);
     return newline === '\r\n' ? result.replaceAll('\n', '\r\n') : result;
 }
 
@@ -70,7 +72,7 @@ async function main() {
     const outputs = await prepareBrowserMolangFiles(root);
     outputs.push({ path: file, text: renderer });
     for (const output of outputs) await writeFile(output.path, output.text, 'utf8');
-    console.log('Patched browser animation bindings, managed MoLang evaluation and finite camera bounds');
+    console.log('Patched browser animations, managed MoLang, finite camera bounds and atlas sampling');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
