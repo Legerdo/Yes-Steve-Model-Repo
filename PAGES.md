@@ -40,7 +40,7 @@ To test the actual viewer locally, install the .NET 10 SDK and `wasm-tools` work
 
 ```powershell
 dotnet workload install wasm-tools
-dotnet publish .\YSMViewer.Browser\YSMViewer.Browser.csproj -c Release -p:WasmBuildNative=false -o .\publish
+dotnet publish .\YSMViewer.Browser\YSMViewer.Browser.csproj -c Release -p:WasmBuildNative=true -o .\publish
 # Copy publish\wwwroot\* into this repository's dist\viewer directory.
 # Copy upstream LICENSE to dist\viewer\COPYING.
 ```
@@ -52,6 +52,8 @@ python -m http.server 8765 --directory dist
 ```
 
 Run `node scripts/verify-dist.mjs dist` after the viewer assets have been copied.
+
+The viewer uses SkiaSharp, which requires native WebAssembly linking. **Do not pass `WasmBuildNative=false`** even if the publish command succeeds: that can yield a site that crashes at `SkiaSharp.SKImageInfo` initialization. When the Emscripten toolchain on Windows is missing or not configured in MSBuild's environment, use the GitHub Actions Linux build instead of producing a nonfunctional binary.
 
 ## Compatibility and risks
 

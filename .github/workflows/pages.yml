@@ -75,7 +75,7 @@ jobs:
       - name: Build standalone YSMViewer WebAssembly app
         run: |
           dotnet publish .vendor/ysmviewer/YSMViewer.Browser/YSMViewer.Browser.csproj \
-            --configuration Release --nologo -p:WasmBuildNative=false \
+            --configuration Release --nologo -p:WasmBuildNative=true \
             --output "${{ runner.temp }}/ysmviewer"
           test -f "${{ runner.temp }}/ysmviewer/wwwroot/index.html"
           mkdir -p dist/viewer
@@ -85,7 +85,6 @@ jobs:
             'Upstream YSMViewer source (GPL-3.0): https://github.com/DrAbcOfficial/YSMViewer/tree/a30baf27425a9cc206af095600e3d98e4eb7f472' \
             "Browser-specific source patch (this repository): https://github.com/${{ github.repository }}/blob/${{ github.sha }}/scripts/patch-browser-logging.mjs" \
             > dist/viewer/SOURCE.txt
-          touch dist/.nojekyll
 
       - name: Verify packaged gallery and renderer
         run: |
@@ -101,7 +100,6 @@ jobs:
         uses: actions/upload-pages-artifact@v4
         with:
           path: dist
-          include-hidden-files: true
 
   deploy:
     if: github.ref == 'refs/heads/main'
