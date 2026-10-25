@@ -79,6 +79,8 @@ Failed parse/evaluation results are explicit null samples. A failed channel uses
 
 The managed runtime tests check nonzero head angles, arithmetic, changing time, loops, custom functions, failure results and model context reset. The browser test loads the actual `.ysm`/ZIP packages, samples `climb`, `climbing`, `walk` and `run`, checks **all** local/world matrices and transformed vertices with finite-number checks, resets the camera, and tests stopping and model changes. A synthetic expression clip additionally proves nonzero context and time-dependent expressions through the actual WASM bridge. Console silence alone is never a pass criterion.
 
+GPU-less Chromium can make Avalonia 12 reject its preferred WebGL UI contexts and use its supported Software2D fallback. The test retains those exact, source-checked startup diagnostics and accepts them only when the same canvas has an application-created 2D context with visible painted pixels. Unrecovered fallback, all other browser errors and animation warnings still fail the deployment gate; the Three.js model checks remain mandatory.
+
 With Python Playwright 1.61.0 and Chrome already available on Windows, run the same packaged-app check with:
 
 ```powershell

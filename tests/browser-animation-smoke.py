@@ -2,6 +2,7 @@
 import argparse
 import json
 import math
+import re
 import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -9,7 +10,14 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 INIT = r'''(() => {
-  const qa=window.__animationSmoke={files:[]};
+  const qa=window.__animationSmoke={files:[],canvasContexts:[]};
+  const getContext=HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext=function(...args){
+    const context=getContext.apply(this,args);
+    qa.canvasContexts.push({canvas:this,kind:args[0],context,
+      failIfMajorPerformanceCaveat:args[1]?.failIfMajorPerformanceCaveat===true});
+    return context;
+  };
   for(const name of ['ysmLoadModelGeometry','ysmLoadAnimationData']) {
     let fn;
     Object.defineProperty(window,name,{configurable:true,get(){return fn;},set(value){fn=function(...args){
@@ -76,6 +84,30 @@ MEASURE = r'''() => {
     camera:cameraValues,progress:JSON.parse(window.ysmGetAnimationProgress())};
 }'''
 
+SOFTWARE_RECOVERY = r'''() => {
+  const entries=window.__animationSmoke.canvasContexts;
+  const failed=entries.filter(e=>e.context===null && e.failIfMajorPerformanceCaveat &&
+    (e.kind==='webgl' || e.kind==='webgl2'));
+  const canvases=[...new Set(failed.map(e=>e.canvas))].map(canvas=>{
+    const entry=entries.find(e=>e.canvas===canvas && e.kind==='2d' && e.context);
+    const rect=canvas.getBoundingClientRect(), style=getComputedStyle(canvas);
+    const visible=canvas.isConnected && rect.width>0 && rect.height>0 &&
+      style.visibility!=='hidden' && Number(style.opacity)>0;
+    let painted=false;
+    if(entry && visible && canvas.width>0 && canvas.height>0) {
+      // Inspect the context created by the application on the same canvas that
+      // rejected WebGL; the test never creates a replacement render context.
+      const data=entry.context.getImageData(0,0,canvas.width,canvas.height).data;
+      painted=data.some((value,index)=>index%4===3 && value>0);
+    }
+    return {id:canvas.id,width:canvas.width,height:canvas.height,visible,painted};
+  });
+  return {failedGpuAttempts:failed.length,canvases};
+}'''
+
+AVALONIA_GPU_FALLBACK = re.compile(
+    r'^Failed to create render target for mode [23] : HTMLCanvasElement\.getContext returned null\.$')
+
 
 def assert_finite(measurement):
     assert not measurement['invalid'], f"Nonfinite scene nodes: {measurement['invalid']}"
@@ -97,6 +129,8 @@ def assert_same_pose(actual, expected):
 
 def run(base, revision, output, channel):
     errors, warnings, records = [], [], []
+    render_fallbacks, ui_recovery = [], []
+    fallback_cursor = 0
     success = False
     with sync_playwright() as pw:
         launch={'headless':True,'args':['--enable-unsafe-swiftshader']}
@@ -106,7 +140,14 @@ def run(base, revision, output, channel):
         page.add_init_script(INIT)
         page.on('pageerror',lambda error: errors.append(str(error)))
         def on_console(message):
-            if message.type=='error': errors.append(message.text)
+            if message.type=='error':
+                if (AVALONIA_GPU_FALLBACK.fullmatch(message.text) and
+                        message.location.get('url')==base+'viewer/_framework/avalonia.js'):
+                    # Avalonia 12 probes WebGL with failIfMajorPerformanceCaveat,
+                    # logs failures, then uses Software2D on GPU-less CI runners.
+                    # Accept only after proving recovery on that exact canvas.
+                    render_fallbacks.append({'message':message.text,'location':message.location})
+                else: errors.append(message.text)
             elif message.type=='warning' and ('[YSM-Three]' in message.text or 'THREE.' in message.text): warnings.append(message.text)
         page.on('console',on_console)
         try:
@@ -204,12 +245,22 @@ def run(base, revision, output, channel):
                     assert all(abs(x-y)<1e-5 for x,y in zip(root['q'],[0,0,0,1])), 'Context changes require a reload'
                     frame.evaluate('window.ysmStopAnimation()')
                     print(json.dumps({'managedBridge':'PASS','nonzeroContext':'PASS','timeAndLoop':'PASS','liveContextChange':'PASS'}),flush=True)
+                model_fallbacks=render_fallbacks[fallback_cursor:]
+                if model_fallbacks:
+                    recovery=frame.evaluate(SOFTWARE_RECOVERY)
+                    assert recovery['failedGpuAttempts']==len(model_fallbacks), 'Unmatched GPU fallback diagnostic'
+                    assert recovery['canvases'] and all(c['visible'] and c['painted'] for c in recovery['canvases']), 'Avalonia software fallback did not render'
+                    ui_recovery.append({'model':model,**recovery})
+                    print(json.dumps({'model':model,'softwareUiRecovery':'PASS',**recovery}),flush=True)
+                fallback_cursor=len(render_fallbacks)
+            assert fallback_cursor==len(render_fallbacks), 'Unvalidated GPU fallback diagnostic'
             assert not errors, f'Browser errors: {errors}'
             assert not warnings, f'Animation fallback warnings: {warnings}'
             success=True
         finally:
             output.mkdir(parents=True,exist_ok=True)
-            (output/'results.json').write_text(json.dumps({'success':success,'records':records,'errors':errors,'warnings':warnings},indent=2),encoding='utf-8')
+            (output/'results.json').write_text(json.dumps({'success':success,'records':records,'errors':errors,'warnings':warnings,
+                'renderFallbacks':render_fallbacks,'uiRecovery':ui_recovery},indent=2),encoding='utf-8')
             if not success:
                 print(json.dumps({'success':False,'errors':errors,'warnings':warnings}),flush=True)
                 page.screenshot(path=str(output/'failure.png'))
