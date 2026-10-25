@@ -19,7 +19,7 @@ The [Pages workflow](.github/workflows/pages.yml) is the only publishing pipelin
 3. Builds a deterministic `models.json` from the GitHub Git tree API, with file sizes and a pinned Git revision. A local/offline build can read filenames from `git ls-tree` (without sizes).
 4. Uses **YSMViewer at `a30baf27425a9cc206af095600e3d98e4eb7f472`**, applies the browser [logging compatibility patch](scripts/patch-browser-logging.mjs) and [animation patch](scripts/patch-browser-animation.mjs), tests the shared and browser MoLang runtimes, builds the `.NET 10` browser application and copies the published `wwwroot` into `dist/viewer/`.
 5. Verifies that the packaged renderer and interop entry point match the patched source, copies the upstream GPL-3.0 license and source links, and validates the deployment directory.
-6. Runs the packaged WebAssembly application in Chromium against the actual Itsuki `.ysm` and Alexten22 ZIP packages. Publication requires finite model/camera transforms, visible geometry after camera reset, movement, stop/model-switch checks and managed expression evaluation. Saves JSON results and screenshots as a workflow artifact before uploading and deploying Pages.
+6. Runs the packaged WebAssembly application in Chrome against the actual Itsuki `.ysm` and Alexten22 ZIP packages. Publication requires finite model/camera transforms, visible geometry after camera reset, movement, stop/model-switch checks and managed expression evaluation. Saves JSON results and screenshots as a workflow artifact before uploading and deploying Pages.
 
 To enable publishing, select **Settings → Pages → Build and deployment → Source: GitHub Actions**. On the initial merge into `main`, the `Build and deploy YSM model gallery` workflow should run. The expected address is:
 
@@ -87,7 +87,7 @@ With Python Playwright 1.61.0 and Chrome already available on Windows, run the s
 python tests/browser-animation-smoke.py --dist dist --browser-channel chrome --output .vendor/animation-smoke
 ```
 
-The script serves the directory with the correct JavaScript/WebAssembly MIME types, closes its browser/server when finished, and saves screenshots and `results.json`. CI installs its own pinned Playwright Chromium. A deployed version can be checked with `--url https://legerdo.github.io/Yes-Steve-Model-Repo/ --revision <commit-sha>` instead of `--dist`.
+The script serves the directory with the correct JavaScript/WebAssembly MIME types, closes its browser/server when finished, and saves screenshots and `results.json`. CI pins Playwright and uses Chrome already included in the [Ubuntu 24.04 runner image](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md), avoiding redundant browser/OS package installation. The test logs the actual browser version. A deployed version can be checked with `--url https://legerdo.github.io/Yes-Steve-Model-Repo/ --revision <commit-sha>` instead of `--dist`.
 
 ## Compatibility and risks
 
