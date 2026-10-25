@@ -72,8 +72,10 @@ jobs:
       - name: Avoid upstream console logger unsupported in WebAssembly
         run: node scripts/patch-browser-logging.mjs .vendor/ysmviewer
 
-      - name: Fix browser animation bindings, MoLang and camera bounds
-        run: node scripts/patch-browser-animation.mjs .vendor/ysmviewer
+      - name: Fix browser animations, MoLang, camera bounds and atlas sampling
+        run: |
+          cp .vendor/ysmviewer/YSMViewer.Browser/wwwroot/ysm-three-renderer.js .vendor/renderer-baseline.js
+          node scripts/patch-browser-animation.mjs .vendor/ysmviewer
 
       - name: Test the shared and browser MoLang runtimes
         run: |
@@ -96,6 +98,7 @@ jobs:
             "Browser-specific source patch (this repository): https://github.com/${{ github.repository }}/blob/${{ github.sha }}/scripts/patch-browser-logging.mjs" \
             "Browser animation source patch (this repository): https://github.com/${{ github.repository }}/blob/${{ github.sha }}/scripts/patch-browser-animation.mjs" \
             "Browser MoLang runtime sources (this repository): https://github.com/${{ github.repository }}/tree/${{ github.sha }}/scripts/browser-animation" \
+            "Browser atlas sampling patch (this repository): https://github.com/${{ github.repository }}/blob/${{ github.sha }}/scripts/patch-browser-atlas.mjs" \
             > dist/viewer/SOURCE.txt
 
       - name: Verify packaged gallery and renderer
@@ -117,12 +120,17 @@ jobs:
       - name: Verify actual model visibility and managed MoLang in the packaged browser
         run: python tests/browser-animation-smoke.py --dist dist --browser-channel chrome --revision "${{ github.sha }}" --output .vendor/animation-smoke
 
+      - name: Verify atlas edges, transparency and occlusion with actual MSAA rendering
+        run: python tests/browser-atlas-smoke.py --dist dist --browser-channel chrome --baseline .vendor/renderer-baseline.js --output .vendor/atlas-smoke
+
       - name: Preserve browser regression evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: animation-browser-regression
-          path: .vendor/animation-smoke/
+          path: |
+            .vendor/animation-smoke/
+            .vendor/atlas-smoke/
           if-no-files-found: ignore
 
       - name: Configure Pages

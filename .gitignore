@@ -14,3 +14,4 @@ dist/
 .vendor/
 tests/molang-runtime/bin/
 tests/molang-runtime/obj/
+tests/__pycache__/

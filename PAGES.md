@@ -19,7 +19,7 @@ The [Pages workflow](.github/workflows/pages.yml) is the only publishing pipelin
 3. Builds a deterministic `models.json` from the GitHub Git tree API, with file sizes and a pinned Git revision. A local/offline build can read filenames from `git ls-tree` (without sizes).
 4. Uses **YSMViewer at `a30baf27425a9cc206af095600e3d98e4eb7f472`**, applies the browser [logging compatibility patch](scripts/patch-browser-logging.mjs) and [animation patch](scripts/patch-browser-animation.mjs), tests the shared and browser MoLang runtimes, builds the `.NET 10` browser application and copies the published `wwwroot` into `dist/viewer/`.
 5. Verifies that the packaged renderer and interop entry point match the patched source, copies the upstream GPL-3.0 license and source links, and validates the deployment directory.
-6. Runs the packaged WebAssembly application in Chrome against the actual Itsuki `.ysm` and Alexten22 ZIP packages. Publication requires finite model/camera transforms, visible geometry after camera reset, movement, stop/model-switch checks and managed expression evaluation. Saves JSON results and screenshots as a workflow artifact before uploading and deploying Pages.
+6. Runs the packaged WebAssembly application in Chrome against the actual Itsuki `.ysm` and Alexten22 ZIP packages. Publication requires finite model/camera transforms, visible geometry after camera reset, movement, stop/model-switch checks and managed expression evaluation. A separate GPU regression requires correct texture-atlas edges under MSAA, preserved transparency and correct occlusion. Saves JSON results and screenshots as a workflow artifact before uploading and deploying Pages.
 
 To enable publishing, select **Settings → Pages → Build and deployment → Source: GitHub Actions**. On the initial merge into `main`, the `Build and deploy YSM model gallery` workflow should run. The expected address is:
 
@@ -43,6 +43,7 @@ To test the actual viewer locally, install the .NET 10 SDK and `wasm-tools` work
 git clone --filter=blob:none https://github.com/DrAbcOfficial/YSMViewer.git .vendor/ysmviewer
 git -C .vendor/ysmviewer checkout --detach a30baf27425a9cc206af095600e3d98e4eb7f472
 node --test tests/gallery.test.mjs tests/browser-animation.test.mjs tests/browser-molang.test.mjs
+Copy-Item .vendor/ysmviewer/YSMViewer.Browser/wwwroot/ysm-three-renderer.js .vendor/renderer-baseline.js
 node scripts/patch-browser-logging.mjs .vendor/ysmviewer
 node scripts/patch-browser-animation.mjs .vendor/ysmviewer
 dotnet test .vendor/ysmviewer/YSMViewer.Core.Tests/YSMViewer.Core.Tests.csproj -c Release
@@ -89,6 +90,20 @@ python tests/browser-animation-smoke.py --dist dist --browser-channel chrome --o
 
 The script serves the directory with the correct JavaScript/WebAssembly MIME types, closes its browser/server when finished, and saves screenshots and `results.json`. CI pins Playwright and uses Chrome already included in the [Ubuntu 24.04 runner image](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md), avoiding redundant browser/OS package installation. The test logs the actual browser version. A deployed version can be checked with `--url https://legerdo.github.io/Yes-Steve-Model-Repo/ --revision <commit-sha>` instead of `--dist`.
 
+### Texture-atlas edge regression
+
+The original MSAA renderer can interpolate texture coordinates outside a triangle at partially covered edge pixels. With tightly packed nearest-filtered atlases, adjacent texels appear as bright dotted seams on hair, clothing and shoes. This can resemble z-fighting even on a single face with no overlapping geometry. Tightening the camera depth range does not resolve this sampling defect.
+
+The [atlas patch](scripts/patch-browser-atlas.mjs), composed into the existing browser patch, uses `centroid` interpolation for the color map's UV varying in the pinned Three.js shaders. It keeps those samples inside the covered triangle while retaining MSAA, authored geometry/UVs, texture filtering, material transparency and depth testing. It applies to initial, cached and replacement model materials. This does not separate genuinely coincident surfaces authored in a model.
+
+The [GPU regression](tests/browser-atlas-smoke.py) loads the actual packaged renderer and draws a rotated single face mapped entirely to a red atlas region, with green neighboring texels and a blue background. Four viewing angles and a texture replacement must contain **zero green pixels**, with MSAA and antialiased edge pixels still present. The unchanged pinned renderer must reproduce the defect as a negative control. Separate samples verify transparent holes, preserved partial-alpha output, opaque texels and a nearer occluder. The partial-alpha comparison preserves the pinned decoder's existing output rather than changing image decoding in this patch.
+
+```powershell
+python tests/browser-atlas-smoke.py --dist dist --browser-channel chrome --baseline .vendor/renderer-baseline.js --output .vendor/atlas-smoke
+```
+
+CI retains the original renderer before patching and runs this check before deployment, alongside the unchanged actual-model animation regression. The shader runs on the viewer's existing WebGL2 path and adds no per-frame CPU work or additional render passes.
+
 ## Compatibility and risks
 
 - The browser viewer is an upstream project; basic 3D rendering, textures and keyframe animations are implemented, but parity with in-game animation controllers and physical MoLang is **not** guaranteed.
@@ -100,6 +115,6 @@ The script serves the directory with the correct JavaScript/WebAssembly MIME typ
 
 ## Licenses and upgrades
 
-YSMViewer is GPL-3.0. Its compiled browser application is built from the pinned upstream source with the corresponding GPL text copied to `viewer/COPYING` and links to the exact upstream source and both browser compatibility patches in `viewer/SOURCE.txt`. It is embedded in an iframe as a standalone application. The gallery's additional JavaScript is published as readable source in this repository.
+YSMViewer is GPL-3.0. Its compiled browser application is built from the pinned upstream source with the corresponding GPL text copied to `viewer/COPYING` and links to the exact upstream source and browser compatibility patches in `viewer/SOURCE.txt`. It is embedded in an iframe as a standalone application. The gallery's additional JavaScript is published as readable source in this repository.
 
 To upgrade, change the pinned commit in the workflow, retest with representative `.ysm` and `.zip` files, and verify browser console errors, textures, animations and package format compatibility before merging.
