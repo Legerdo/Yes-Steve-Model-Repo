@@ -17,7 +17,7 @@ The [Pages workflow](.github/workflows/pages.yml) is the only publishing pipelin
 1. Sparse-checks out this repository with Git blob filtering, so the model files are not downloaded during the build.
 2. Tests model indexing, URL encoding and common error conditions.
 3. Builds a deterministic `models.json` from the GitHub Git tree API, with file sizes and a pinned Git revision. A local/offline build can read filenames from `git ls-tree` (without sizes).
-4. Checks out **YSMViewer at `a30baf27425a9cc206af095600e3d98e4eb7f472`**, builds its `.NET 10` browser application and copies the contents of the published `wwwroot` into `dist/viewer/`.
+4. Checks out **YSMViewer at `a30baf27425a9cc206af095600e3d98e4eb7f472`**, replaces its browser-only threaded `AddConsole` logging registration with a browser-compatible empty logger pipeline (see [the narrowly scoped patch](scripts/patch-browser-logging.mjs)), builds the `.NET 10` browser application and copies the contents of the published `wwwroot` into `dist/viewer/`.
 5. Copies the upstream GPL-3.0 license and source URL, validates the deployment directory, then uploads and deploys the Pages artifact.
 
 To enable publishing, select **Settings → Pages → Build and deployment → Source: GitHub Actions**. On the initial merge into `main`, the `Build and deploy YSM model gallery` workflow should run. The expected address is:
@@ -64,6 +64,6 @@ Run `node scripts/verify-dist.mjs dist` after the viewer assets have been copied
 
 ## Licenses and upgrades
 
-YSMViewer is GPL-3.0. Its compiled browser application is built from the pinned upstream source with the corresponding GPL text copied to `viewer/COPYING` and a link to exact source in `viewer/SOURCE.txt`. It is embedded in an iframe as a standalone application. The gallery's additional JavaScript is published as readable source in this repository.
+YSMViewer is GPL-3.0. Its compiled browser application is built from the pinned upstream source with the corresponding GPL text copied to `viewer/COPYING` and links to both the exact upstream source and the browser-only compatibility patch in `viewer/SOURCE.txt`. It is embedded in an iframe as a standalone application. The gallery's additional JavaScript is published as readable source in this repository.
 
 To upgrade, change the pinned commit in the workflow, retest with representative `.ysm` and `.zip` files, and verify browser console errors, textures, animations and package format compatibility before merging.

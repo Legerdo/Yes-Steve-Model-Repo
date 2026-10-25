@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import {
   buildCatalog, DEFAULT_REPOSITORY, parseGitPaths,
 } from '../scripts/build-model-index.mjs';
+import { patchBrowserSource } from '../scripts/patch-browser-logging.mjs';
 import {
   filterModels, formatBytes, isValidModelPath, rawModelUrl,
   readableCategory, sourceFileUrl, viewerUrl,
@@ -80,4 +81,13 @@ test('page references bundled renderer and copyright notice, not arbitrary HTML'
   assert.match(html, /viewer\/COPYING/);
   assert.match(app, /new URL\('\.\/viewer\/', location\.href\)/);
   assert.doesNotMatch(app, /innerHTML\s*=/);
+});
+
+test('patches only the expected WebAssembly-incompatible console logging registration', () => {
+  const upstream = 'using Microsoft.Extensions.Logging;\nservices.AddPlatformLogging();';
+  const result = patchBrowserSource(upstream);
+  assert.match(result, /AddLogging\(builder => builder.SetMinimumLevel\(LogLevel.Warning\)\)/);
+  assert.doesNotMatch(result, /AddPlatformLogging\(\)/);
+  assert.throws(() => patchBrowserSource(result), /changed/);
+  assert.throws(() => patchBrowserSource(upstream + '\nservices.AddPlatformLogging();'), /2 matches/);
 });
