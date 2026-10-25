@@ -72,8 +72,13 @@ jobs:
       - name: Avoid upstream console logger unsupported in WebAssembly
         run: node scripts/patch-browser-logging.mjs .vendor/ysmviewer
 
-      - name: Fix browser animation bone bindings
+      - name: Fix browser animation bindings, MoLang and camera bounds
         run: node scripts/patch-browser-animation.mjs .vendor/ysmviewer
+
+      - name: Test the shared and browser MoLang runtimes
+        run: |
+          dotnet test .vendor/ysmviewer/YSMViewer.Core.Tests/YSMViewer.Core.Tests.csproj --configuration Release --nologo
+          dotnet run --project tests/molang-runtime/MolangRuntimeTests.csproj --configuration Release
 
       - name: Build standalone YSMViewer WebAssembly app
         run: |
@@ -84,17 +89,40 @@ jobs:
           mkdir -p dist/viewer
           cp -a "${{ runner.temp }}/ysmviewer/wwwroot/." dist/viewer/
           cmp .vendor/ysmviewer/YSMViewer.Browser/wwwroot/ysm-three-renderer.js dist/viewer/ysm-three-renderer.js
+          cmp .vendor/ysmviewer/YSMViewer.Browser/wwwroot/main.js dist/viewer/main.js
           cp .vendor/ysmviewer/LICENSE dist/viewer/COPYING
           printf '%s\n' \
             'Upstream YSMViewer source (GPL-3.0): https://github.com/DrAbcOfficial/YSMViewer/tree/a30baf27425a9cc206af095600e3d98e4eb7f472' \
             "Browser-specific source patch (this repository): https://github.com/${{ github.repository }}/blob/${{ github.sha }}/scripts/patch-browser-logging.mjs" \
             "Browser animation source patch (this repository): https://github.com/${{ github.repository }}/blob/${{ github.sha }}/scripts/patch-browser-animation.mjs" \
+            "Browser MoLang runtime sources (this repository): https://github.com/${{ github.repository }}/tree/${{ github.sha }}/scripts/browser-animation" \
             > dist/viewer/SOURCE.txt
 
       - name: Verify packaged gallery and renderer
         run: |
           node scripts/verify-dist.mjs dist
           du -sh dist
+
+      - name: Set up Python for browser animation regressions
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install the browser test runner
+        run: |
+          python -m pip install playwright==1.61.0
+          python -m playwright install --with-deps chromium
+
+      - name: Verify actual model visibility and managed MoLang in the packaged browser
+        run: python tests/browser-animation-smoke.py --dist dist --revision "${{ github.sha }}" --output .vendor/animation-smoke
+
+      - name: Preserve browser regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: animation-browser-regression
+          path: .vendor/animation-smoke/
+          if-no-files-found: ignore
 
       - name: Configure Pages
         if: github.ref == 'refs/heads/main'

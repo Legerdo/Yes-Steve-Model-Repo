@@ -5,6 +5,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { patchBrowserMolangRenderer, prepareBrowserMolangFiles } from './patch-browser-molang.mjs';
 
 const ORIGINAL_BINDING = `        const bonePath = getObjectPath(scene, boneObj);
         if (!bonePath) continue;`;
@@ -47,8 +49,12 @@ function replaceOnce(source, original, replacement, label) {
 export function patchBrowserAnimationSource(source) {
     const newline = source.includes('\r\n') ? '\r\n' : '\n';
     let result = source.replaceAll('\r\n', '\n');
+    if (createHash('sha256').update(result).digest('hex') !== '3bb1f44d53911b008fcbc0a47b4a3db01632232b7fece263404a01e24665635f') {
+        throw new Error('Pinned YSMViewer renderer changed; review upstream before upgrading');
+    }
     result = replaceOnce(result, ORIGINAL_BINDING, UUID_BINDING, 'animation binding');
     result = replaceOnce(result, ORIGINAL_PATH_HELPER, '', 'animation path helper');
+    result = patchBrowserMolangRenderer(result);
     return newline === '\r\n' ? result.replaceAll('\n', '\r\n') : result;
 }
 
@@ -56,10 +62,15 @@ async function main() {
     if (process.argv.length !== 3) {
         throw new Error('Usage: node scripts/patch-browser-animation.mjs <upstream-dir>');
     }
-    const file = join(resolve(process.argv[2]), 'YSMViewer.Browser', 'wwwroot', 'ysm-three-renderer.js');
+    const root = resolve(process.argv[2]);
+    const file = join(root, 'YSMViewer.Browser', 'wwwroot', 'ysm-three-renderer.js');
     const original = await readFile(file, 'utf8');
-    await writeFile(file, patchBrowserAnimationSource(original), 'utf8');
-    console.log('Patched pinned YSMViewer browser animation binding');
+    const renderer = patchBrowserAnimationSource(original);
+    // Validate all upstream inputs before writing any patched file.
+    const outputs = await prepareBrowserMolangFiles(root);
+    outputs.push({ path: file, text: renderer });
+    for (const output of outputs) await writeFile(output.path, output.text, 'utf8');
+    console.log('Patched browser animation bindings, managed MoLang evaluation and finite camera bounds');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

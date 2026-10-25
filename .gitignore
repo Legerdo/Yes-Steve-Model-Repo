@@ -12,3 +12,5 @@ wine_fox_new_year/
 boosterModels/
 dist/
 .vendor/
+tests/molang-runtime/bin/
+tests/molang-runtime/obj/
