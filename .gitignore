@@ -10,3 +10,5 @@ wine_fox_jk/
 New folder/
 wine_fox_new_year/
 boosterModels/
+dist/
+.vendor/

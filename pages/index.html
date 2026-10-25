@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Browse and preview Yes Steve Model Minecraft characters in your browser.">
+  <title>YSM Character Gallery</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="site-header">
+      <div class="brand">
+        <div class="brand-symbol" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div>
+          <p class="eyebrow">Minecraft · Yes Steve Model</p>
+          <h1>Character Gallery <span class="version">BROWSER EDITION</span></h1>
+        </div>
+      </div>
+      <nav class="header-links" aria-label="프로젝트 바로가기">
+        <a class="header-link" href="https://github.com/Legerdo/Yes-Steve-Model-Repo" target="_blank" rel="noopener noreferrer">모델 저장소 <span aria-hidden="true">↗</span></a>
+        <a class="header-link" href="https://github.com/DrAbcOfficial/YSMViewer" target="_blank" rel="noopener noreferrer">YSMViewer 소스 <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+
+    <main class="workspace">
+      <aside class="library-panel" aria-label="캐릭터 목록">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">01 / MODEL LIBRARY</p>
+            <h2>캐릭터 탐색</h2>
+          </div>
+          <span class="total-counter" id="total-count">—</span>
+        </div>
+
+        <div class="filters">
+          <label for="search">모델 검색</label>
+          <div class="search-wrap">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+            <input id="search" type="search" placeholder="이름 또는 경로 입력" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="filter-row">
+            <div>
+              <label for="category">카테고리</label>
+              <select id="category"><option value="">전체 카테고리</option></select>
+            </div>
+            <div>
+              <label for="format">파일 형식</label>
+              <select id="format">
+                <option value="">모든 형식</option>
+                <option value="ysm">.ysm</option>
+                <option value="zip">.zip</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="list-meta">
+          <p id="results-count" aria-live="polite">목록을 불러오는 중...</p>
+          <span id="catalog-version" class="commit-tag"></span>
+        </div>
+        <div id="model-list" class="model-list" aria-label="모델 선택 목록"></div>
+        <div class="pager">
+          <button id="prev-page" type="button" disabled aria-label="이전 페이지">← 이전</button>
+          <span id="page-label">—</span>
+          <button id="next-page" type="button" disabled aria-label="다음 페이지">다음 →</button>
+        </div>
+      </aside>
+
+      <section class="preview-panel" aria-label="선택한 캐릭터의 3D 미리보기">
+        <div class="preview-heading">
+          <div class="preview-title">
+            <p class="eyebrow">02 / LIVE 3D PREVIEW</p>
+            <h2 id="selected-name">모델을 선택해 줘</h2>
+            <p id="selected-path" class="selected-path">모델을 선택하면 브라우저에서 3D로 표시함</p>
+          </div>
+          <span id="selected-format" class="format-chip" hidden></span>
+        </div>
+
+        <div class="viewer-container">
+          <iframe id="viewer" title="YSMViewer 3D 캐릭터 미리보기" allow="fullscreen" referrerpolicy="no-referrer"></iframe>
+          <div id="viewer-placeholder" class="viewer-placeholder">
+            <div class="placeholder-icon" aria-hidden="true">▧</div>
+            <strong>미리보기 대기 중</strong>
+            <span>왼쪽 목록에서 캐릭터를 선택해 줘.</span>
+          </div>
+          <span class="viewer-watermark" aria-hidden="true">YSM / 3D VIEWER</span>
+        </div>
+
+        <div class="control-bar">
+          <div class="camera-tip"><span class="control-dot" aria-hidden="true"></span>좌클릭 드래그 회전 <span class="separator">/</span> 휠 확대 <span class="separator">/</span> 우클릭 이동</div>
+          <div class="action-links">
+            <a id="open-viewer" class="action-link" href="#" target="_blank" rel="noopener noreferrer" aria-disabled="true">전체 화면 ↗</a>
+            <a id="open-source" class="action-link" href="#" target="_blank" rel="noopener noreferrer" aria-disabled="true">GitHub 원본 ↗</a>
+            <a id="download-model" class="action-link" href="#" download aria-disabled="true">다운로드 ↓</a>
+            <button id="copy-link" class="action-primary" type="button" disabled>링크 복사</button>
+          </div>
+        </div>
+        <p id="viewer-status" class="viewer-status" role="status">모델 데이터는 선택 시에만 다운로드됨. 첫 실행에는 WebAssembly 초기화 시간이 필요할 수 있음.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Models: <a href="https://github.com/Legerdo/Yes-Steve-Model-Repo" target="_blank" rel="noopener noreferrer">Yes-Steve-Model-Repo</a> · Viewer: <a href="https://github.com/DrAbcOfficial/YSMViewer" target="_blank" rel="noopener noreferrer">YSMViewer (GPL-3.0)</a></span>
+      <span>모델별 저작권·사용 조건은 원 제작자에게 귀속. <a href="./viewer/COPYING" target="_blank" rel="noopener noreferrer">뷰어 라이선스</a></span>
+    </footer>
+  </div>
+</body>
+</html>
