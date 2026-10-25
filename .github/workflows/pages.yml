@@ -42,7 +42,15 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Test catalog and URL handling
+      - name: Checkout pinned YSMViewer (GPL-3.0)
+        uses: actions/checkout@v4
+        with:
+          repository: DrAbcOfficial/YSMViewer
+          ref: a30baf27425a9cc206af095600e3d98e4eb7f472
+          path: .vendor/ysmviewer
+          persist-credentials: false
+
+      - name: Test catalog, URLs and browser animation playback
         run: node --test tests/*.test.mjs
 
       - name: Assemble gallery and immutable catalog
@@ -52,14 +60,6 @@ jobs:
           mkdir -p dist
           cp -a pages/. dist/
           node scripts/build-model-index.mjs --out dist/models.json
-
-      - name: Checkout pinned YSMViewer (GPL-3.0)
-        uses: actions/checkout@v4
-        with:
-          repository: DrAbcOfficial/YSMViewer
-          ref: a30baf27425a9cc206af095600e3d98e4eb7f472
-          path: .vendor/ysmviewer
-          persist-credentials: false
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
@@ -72,6 +72,9 @@ jobs:
       - name: Avoid upstream console logger unsupported in WebAssembly
         run: node scripts/patch-browser-logging.mjs .vendor/ysmviewer
 
+      - name: Fix browser animation bone bindings
+        run: node scripts/patch-browser-animation.mjs .vendor/ysmviewer
+
       - name: Build standalone YSMViewer WebAssembly app
         run: |
           dotnet publish .vendor/ysmviewer/YSMViewer.Browser/YSMViewer.Browser.csproj \
@@ -80,10 +83,12 @@ jobs:
           test -f "${{ runner.temp }}/ysmviewer/wwwroot/index.html"
           mkdir -p dist/viewer
           cp -a "${{ runner.temp }}/ysmviewer/wwwroot/." dist/viewer/
+          cmp .vendor/ysmviewer/YSMViewer.Browser/wwwroot/ysm-three-renderer.js dist/viewer/ysm-three-renderer.js
           cp .vendor/ysmviewer/LICENSE dist/viewer/COPYING
           printf '%s\n' \
             'Upstream YSMViewer source (GPL-3.0): https://github.com/DrAbcOfficial/YSMViewer/tree/a30baf27425a9cc206af095600e3d98e4eb7f472' \
             "Browser-specific source patch (this repository): https://github.com/${{ github.repository }}/blob/${{ github.sha }}/scripts/patch-browser-logging.mjs" \
+            "Browser animation source patch (this repository): https://github.com/${{ github.repository }}/blob/${{ github.sha }}/scripts/patch-browser-animation.mjs" \
             > dist/viewer/SOURCE.txt
 
       - name: Verify packaged gallery and renderer
