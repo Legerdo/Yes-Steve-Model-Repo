@@ -69,6 +69,9 @@ jobs:
       - name: Install wasm-tools
         run: dotnet workload install wasm-tools --skip-manifest-update
 
+      - name: Avoid upstream console logger unsupported in WebAssembly
+        run: node scripts/patch-browser-logging.mjs .vendor/ysmviewer
+
       - name: Build standalone YSMViewer WebAssembly app
         run: |
           dotnet publish .vendor/ysmviewer/YSMViewer.Browser/YSMViewer.Browser.csproj \
@@ -78,7 +81,10 @@ jobs:
           mkdir -p dist/viewer
           cp -a "${{ runner.temp }}/ysmviewer/wwwroot/." dist/viewer/
           cp .vendor/ysmviewer/LICENSE dist/viewer/COPYING
-          printf '%s\n' 'Upstream YSMViewer source (GPL-3.0): https://github.com/DrAbcOfficial/YSMViewer/tree/a30baf27425a9cc206af095600e3d98e4eb7f472' > dist/viewer/SOURCE.txt
+          printf '%s\n' \
+            'Upstream YSMViewer source (GPL-3.0): https://github.com/DrAbcOfficial/YSMViewer/tree/a30baf27425a9cc206af095600e3d98e4eb7f472' \
+            "Browser-specific source patch (this repository): https://github.com/${{ github.repository }}/blob/${{ github.sha }}/scripts/patch-browser-logging.mjs" \
+            > dist/viewer/SOURCE.txt
           touch dist/.nojekyll
 
       - name: Verify packaged gallery and renderer
