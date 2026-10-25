@@ -1,0 +1,113 @@
+name: Build and deploy YSM model gallery
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pages.yml'
+      - 'pages/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'PAGES.md'
+      - '**/*.ysm'
+      - '**/*.zip'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ysm-model-gallery-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout model index source without downloading large blobs
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            .github
+            pages
+            scripts
+            tests
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test catalog and URL handling
+        run: node --test tests/*.test.mjs
+
+      - name: Assemble gallery and immutable catalog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dist
+          cp -a pages/. dist/
+          node scripts/build-model-index.mjs --out dist/models.json
+
+      - name: Checkout pinned YSMViewer (GPL-3.0)
+        uses: actions/checkout@v4
+        with:
+          repository: DrAbcOfficial/YSMViewer
+          ref: a30baf27425a9cc206af095600e3d98e4eb7f472
+          path: .vendor/ysmviewer
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install wasm-tools
+        run: dotnet workload install wasm-tools --skip-manifest-update
+
+      - name: Build standalone YSMViewer WebAssembly app
+        run: |
+          dotnet publish .vendor/ysmviewer/YSMViewer.Browser/YSMViewer.Browser.csproj \
+            --configuration Release --nologo -p:WasmBuildNative=false \
+            --output "${{ runner.temp }}/ysmviewer"
+          test -f "${{ runner.temp }}/ysmviewer/wwwroot/index.html"
+          mkdir -p dist/viewer
+          cp -a "${{ runner.temp }}/ysmviewer/wwwroot/." dist/viewer/
+          cp .vendor/ysmviewer/LICENSE dist/viewer/COPYING
+          printf '%s\n' 'Upstream YSMViewer source (GPL-3.0): https://github.com/DrAbcOfficial/YSMViewer/tree/a30baf27425a9cc206af095600e3d98e4eb7f472' > dist/viewer/SOURCE.txt
+          touch dist/.nojekyll
+
+      - name: Verify packaged gallery and renderer
+        run: |
+          node scripts/verify-dist.mjs dist
+          du -sh dist
+
+      - name: Configure Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+          include-hidden-files: true
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

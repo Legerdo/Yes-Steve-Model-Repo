@@ -5,6 +5,16 @@
     <img src="https://count.getloli.com/@ysmmodelrepo?name=ysmmodelrepo&theme=gelbooru&padding=8&offset=0&align=top&scale=1.3&pixelated=1&darkmode=auto"/>
 </p>
 
+## Browser character gallery
+
+Preview the YSM models from this repository in a browser:
+
+**[Open the YSM Character Gallery](https://legerdo.github.io/Yes-Steve-Model-Repo/)**
+
+The gallery provides category/name search, `.ysm` / `.zip` filtering, direct model downloads, shareable links and 3D previews via [YSMViewer](https://github.com/DrAbcOfficial/YSMViewer). Models stay in this repository and are fetched on demand; the GitHub Pages deployment does not duplicate the model archive.
+
+See [PAGES.md](PAGES.md) for the deployment process, local development, compatibility notes and license attribution.
+
 # Thank you
  - Special thanks [TartaricAcid](https://github.com/TartaricAcid) (Yes Steve Models' mod author) for creating YSM mod and advertising this repo on the mod's download page
   
